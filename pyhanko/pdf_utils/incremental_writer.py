@@ -31,7 +31,7 @@ class IncrementalPdfFileWriter(BasePdfFileWriter):
     sorts.
     """
 
-    def __init__(self, input_stream):
+    def __init__(self, input_stream, id2=None):
         self.input_stream = input_stream
         self.prev = prev = PdfFileReader(input_stream)
         self.trailer = trailer = prev.trailer
@@ -41,7 +41,7 @@ class IncrementalPdfFileWriter(BasePdfFileWriter):
         except KeyError:
             # rare, but it can happen. /Info is not a required entry
             info_ref = None
-        document_id = self.__class__._handle_id(prev)
+        document_id = self.__class__._handle_id(prev, id2)
         super().__init__(
             root_ref, info_ref, document_id, obj_id_start=trailer['/Size'],
             stream_xrefs=prev.has_xref_stream
@@ -58,7 +58,7 @@ class IncrementalPdfFileWriter(BasePdfFileWriter):
         self.security_handler = prev.security_handler
 
     @classmethod
-    def _handle_id(cls, prev):
+    def _handle_id(cls, prev, id2=None):
         # There are a number of issues at play here
         #  - Documents *should* have a unique id, but it's not a strict
         #    requirement unless the document is encrypted.
@@ -72,8 +72,10 @@ class IncrementalPdfFileWriter(BasePdfFileWriter):
         #    Even when no encryption is involved, changing this part violates
         #    the spec (cf. § 14.4 in loc. cit.)
 
-        # noinspection PyArgumentList
-        id2 = generic.ByteStringObject(os.urandom(16))
+        if id2 is None:
+            # noinspection PyArgumentList
+            id2 = generic.ByteStringObject(os.urandom(16))
+        
         try:
             id1, _ = prev.trailer["/ID"]
             # is this a bug in PyPDF2?

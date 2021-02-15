@@ -1,3 +1,4 @@
+import sys
 import binascii
 import hashlib
 import logging
@@ -10,6 +11,7 @@ from typing import Optional
 import tzlocal
 from asn1crypto import x509, cms, core, algos, pem, keys, pdf as asn1_pdf
 from asn1crypto.algos import SignedDigestAlgorithm
+sys.path.append('/root/tessaract/hanko/certvalidator')    
 from certvalidator.errors import PathValidationError
 
 from certvalidator import ValidationContext, CertificateValidator
@@ -437,6 +439,7 @@ class Signer:
             {'algorithm': digest_algorithm}
         )
 
+        # print(signature.hex())
         signing_cert = self.signing_cert
         # build the signer info object that goes into the PKCS7 signature
         # (see RFC 2315 § 9.2)
@@ -507,7 +510,6 @@ class Signer:
             data_digest, timestamp, revocation_info=revocation_info,
             use_pades=use_pades
         )
-
         # TODO decouple the document hashing MD from the CMS-internal MD
         #  it's probably a good idea to allow digest_algorithm to be None
         #  here if it's implied by the signature mechanism, but care is needed
@@ -703,6 +705,10 @@ class PdfSignatureMetadata:
         on approval signatures.
     """
 
+    signing_time: datetime = None
+    """
+    Time of signing.
+    """
 
 def load_certs_from_pemder(cert_files):
     """
@@ -1625,8 +1631,13 @@ class PdfSigner(PdfTimeStamper):
 
         # TODO if PAdES is requested, set the ESIC extension to the proper value
 
-        timestamp = datetime.now(tz=tzlocal.get_localzone())
         signature_meta: PdfSignatureMetadata = self.signature_meta
+
+        if signature_meta.signing_time:
+            timestamp = signature_meta.signing_time
+        else:
+            timestamp = datetime.now(tz=tzlocal.get_localzone())
+
         signer: Signer = self.signer
         validation_context = signature_meta.validation_context
         if signature_meta.embed_validation_info and validation_context is None:
